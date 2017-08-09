@@ -1,9 +1,9 @@
 package org.shu.plug.timedautostart;
 
 import java.util.GregorianCalendar;
-import org.gudy.azureus2.plugins.download.Download;
-import org.gudy.azureus2.plugins.download.DownloadException;
-import org.gudy.azureus2.plugins.logging.LoggerChannel;
+import com.biglybt.pif.download.Download;
+import com.biglybt.pif.download.DownloadException;
+import com.biglybt.pif.logging.LoggerChannel;
 
 public class AutoStartThread extends Thread {
 	
@@ -23,7 +23,8 @@ public class AutoStartThread extends Thread {
 		this.hashCodesKey = hashCodesKey;
 		this.stopped = download.getState() == Download.ST_STOPPED;
 	}
-	
+
+	@Override
 	public void run(){
 		try {
 			if (stopped){

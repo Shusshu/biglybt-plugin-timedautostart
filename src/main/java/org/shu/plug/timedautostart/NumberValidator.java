@@ -1,6 +1,6 @@
 package org.shu.plug.timedautostart;
 
-import org.gudy.azureus2.plugins.ui.UIInputValidator;
+import com.biglybt.pif.ui.UIInputValidator;
 
 public class NumberValidator implements UIInputValidator{
 	

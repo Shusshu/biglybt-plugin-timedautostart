@@ -1,23 +1,21 @@
 package org.shu.plug.timedautostart;
 
 import java.util.HashMap;
-import org.gudy.azureus2.plugins.Plugin;
-import org.gudy.azureus2.plugins.PluginException;
-import org.gudy.azureus2.plugins.PluginInterface;
-import org.gudy.azureus2.plugins.download.Download;
-import org.gudy.azureus2.plugins.logging.LoggerChannel;
-import org.gudy.azureus2.plugins.ui.UIInstance;
-import org.gudy.azureus2.plugins.ui.UIManagerListener;
-import org.gudy.azureus2.plugins.ui.UIMessage;
-import org.gudy.azureus2.plugins.ui.menus.MenuItem;
-import org.gudy.azureus2.plugins.ui.menus.MenuItemFillListener;
-import org.gudy.azureus2.plugins.ui.menus.MenuItemListener;
-import org.gudy.azureus2.plugins.ui.menus.MenuManager;
-import org.gudy.azureus2.plugins.ui.tables.TableManager;
-import org.gudy.azureus2.plugins.ui.tables.TableRow;
-import org.gudy.azureus2.plugins.utils.LocaleUtilities;
-import org.gudy.azureus2.ui.swt.plugins.UISWTInputReceiver;
-import org.gudy.azureus2.ui.swt.plugins.UISWTInstance;
+import com.biglybt.pif.Plugin;
+import com.biglybt.pif.PluginException;
+import com.biglybt.pif.PluginInterface;
+import com.biglybt.pif.download.Download;
+import com.biglybt.pif.logging.LoggerChannel;
+import com.biglybt.pif.ui.*;
+import com.biglybt.pif.ui.menus.MenuItem;
+import com.biglybt.pif.ui.menus.MenuItemFillListener;
+import com.biglybt.pif.ui.menus.MenuItemListener;
+import com.biglybt.pif.ui.menus.MenuManager;
+import com.biglybt.pif.ui.tables.TableManager;
+import com.biglybt.pif.ui.tables.TableRow;
+import com.biglybt.pif.utils.LocaleUtilities;
+import com.biglybt.ui.swt.pif.UISWTInputReceiver;
+import com.biglybt.ui.swt.pif.UISWTInstance;
 
 public class Main implements Plugin {
 	
@@ -26,7 +24,8 @@ public class Main implements Plugin {
 	private LoggerChannel logger;
 	private UISWTInstance uISWTInstance;
 	private static HashMap<Integer, AutoStartThread> hAutoStartThread = new HashMap<Integer, AutoStartThread>();
-	
+
+	@Override
 	public void initialize(PluginInterface pluginInterface) throws PluginException {
 		this.pluginInterface = pluginInterface;
 		this.pluginInterface.getUtilities().getLocaleUtilities().integrateLocalisedMessageBundle("AutoStartMessage");
@@ -35,7 +34,8 @@ public class Main implements Plugin {
 		menuManager = pluginInterface.getUIManager().getMenuManager();
 		
         this.pluginInterface.getUIManager().addUIListener(new UIManagerListener() {
-            
+
+			@Override
 			public void UIAttached(UIInstance instance) {
             	
                 if (instance instanceof UISWTInstance) {
@@ -44,6 +44,8 @@ public class Main implements Plugin {
                     createAutoStartSeletedStoppedTorrentsTableMenuItem();
                 }
             }
+
+			@Override
             public void UIDetached(UIInstance instance) {
             	if (instance instanceof UISWTInstance){
                     
@@ -72,6 +74,7 @@ public class Main implements Plugin {
 		
 		MenuItemFillListener cancelFillListener = new MenuItemFillListener(){
 
+			@Override
 			public void menuWillBeShown(MenuItem menu, Object data) {
 				TableRow[] rows = ((TableRow[])data);
 				
@@ -85,6 +88,7 @@ public class Main implements Plugin {
 		
 		MenuItemListener cancelMultiListener = new MenuItemListener(){
 
+			@Override
 			public void selected(MenuItem menu, Object target) {
 				TableRow[] rows = ((TableRow[])target);
 				
@@ -99,6 +103,7 @@ public class Main implements Plugin {
 		
 		/*MenuItemFillListener startFillListener = new MenuItemFillListener(){
 
+			@Override
 			public void menuWillBeShown(MenuItem menu, Object data) {
 				TableRow[] rows = ((TableRow[])data);
 				
@@ -117,6 +122,7 @@ public class Main implements Plugin {
 		};*/
 		MenuItemListener startMultiListener = new MenuItemListener(){
 
+			@Override
 			public void selected(MenuItem menu, Object target) {
 				TableRow[] rows = ((TableRow[])target);
 				
@@ -195,20 +201,35 @@ public class Main implements Plugin {
 	public void ipc_autoStartTorrents(Download[] downloads) {
 		autoStartTorrents(downloads, "shu.plugin.tablemenu");
 	}
-	
+
 	protected void autoStartTorrents(Download[] downloads, String ressourceKey) {
-		boolean cancelTimer = false, autorestartStoppedTorrents = false;
-		long seconds;
-		
 		try {
-			if (hasAtLeastOneTimer(downloads)) cancelTimer = askYesNoQuestion(ressourceKey, ".canceltimer");
-			
-			if (hasAtLeastOneStoppedTorrent(downloads)) autorestartStoppedTorrents = askYesNoQuestion(ressourceKey, ".autorestartstoppedtorrentmessage");
-			seconds = askNumberOfSecondsToWait(ressourceKey);
-			
+			final boolean cancelTimer = hasAtLeastOneTimer(downloads)
+					? askYesNoQuestion(ressourceKey, ".canceltimer") : false;
+			final boolean autorestartStoppedTorrents = hasAtLeastOneStoppedTorrent(downloads)
+					? askYesNoQuestion(ressourceKey,".autorestartstoppedtorrentmessage")
+					: false;
+
+			askNumberOfSecondsToWait(ressourceKey, new AskNumSecondsResults() {
+				@Override
+				public void numberOfSecondsToWait(long ms) {
+					autoStartTorrents2(downloads, cancelTimer,
+							autorestartStoppedTorrents, ms);
+				}
+
+				@Override
+				public void cancelled() {
+
+				}
+			});
+
 		} catch (CancelException e1) {
-			return ;
+			return;
 		}
+	}
+
+	protected void autoStartTorrents2(Download[] downloads,  boolean cancelTimer,
+	                                  boolean autorestartStoppedTorrents, long ms) {
 		AutoStartThread autoStartingThread, autoStartingThreadNew;
 		
     	for(int i=0 ; i<downloads.length; i++){
@@ -226,7 +247,7 @@ public class Main implements Plugin {
     				}
 				}
     		}
-    		autoStartingThreadNew = new AutoStartThread(logger, downloads[i], seconds, autorestartStoppedTorrents, calculateHashCodesKey(downloads));
+			autoStartingThreadNew = new AutoStartThread(logger, downloads[i], ms, autorestartStoppedTorrents, calculateHashCodesKey(downloads));
     		hAutoStartThread.put(downloads[i].hashCode(), autoStartingThreadNew);
     		autoStartingThreadNew.start();
     	}
@@ -270,29 +291,45 @@ public class Main implements Plugin {
 		if (result == UIMessage.ANSWER_CANCEL) throw new CancelException();
 		return UIMessage.ANSWER_YES == result;
 	}
+
+	private interface AskNumSecondsResults {
+		void numberOfSecondsToWait(long ms);
+
+		void cancelled();
+	}
 	
-	protected long askNumberOfSecondsToWait(String ressourceKey) throws CancelException {
+	protected long askNumberOfSecondsToWait(String ressourceKey, final AskNumSecondsResults l) {
 		UISWTInputReceiver inputReceiver = (UISWTInputReceiver) uISWTInstance.getInputReceiver();
 		inputReceiver.setMessage(ressourceKey+".inputmessage");
 		inputReceiver.setTitle(ressourceKey+".inputmessage.title");
 		inputReceiver.setPreenteredText("5", true);
 		inputReceiver.allowEmptyInput(false);
 		inputReceiver.setInputValidator(new NumberValidator());
-		
-		inputReceiver.prompt();
-		if (!inputReceiver.hasSubmittedInput()){
-			throw new CancelException();
-		}
+
+		inputReceiver.prompt(new UIInputReceiverListener() {
+			@Override
+			public void UIInputReceiverClosed(UIInputReceiver receiver) {
+
+				if (receiver.hasSubmittedInput()) {
+					l.numberOfSecondsToWait(((long) (Double.valueOf(receiver.getSubmittedInput()) * 60 * 1000)));
+				} else {
+					l.cancelled();
+				}
+			}
+		});
 		return ((long)(Double.valueOf(inputReceiver.getSubmittedInput()) * 60 * 1000));
 	}
 	
 	protected void createSysTrayMenuItem() {
 		MenuItem menuItemAutoStartTray = menuManager.addMenuItem(MenuManager.MENU_SYSTRAY, "shu.plugin.systray");
+		menuItemAutoStartTray.setDisposeWithUIDetach(UIInstance.UIT_SWT);
 		MenuItem menuItemCancelAutoStartTray = menuManager.addMenuItem(MenuManager.MENU_SYSTRAY, "shu.plugin.systray.cancel");
-        
-		
+		menuItemCancelAutoStartTray.setDisposeWithUIDetach(UIInstance.UIT_SWT);
+
+
 		menuItemCancelAutoStartTray.addFillListener(new MenuItemFillListener(){
-			
+
+			@Override
 			public void menuWillBeShown(MenuItem menu, Object data) {
 				showCancelMenuAndTimeLeft(menu, pluginInterface.getDownloadManager().getDownloads(), "shu.plugin.systray");
 			}
@@ -301,6 +338,7 @@ public class Main implements Plugin {
 		
 		menuItemCancelAutoStartTray.addListener(new MenuItemListener(){
 
+			@Override
 			public void selected(MenuItem menu, Object target) {
 				cancelAutoStart(pluginInterface.getDownloadManager().getDownloads(), "shu.plugin.systray");
 			}
@@ -308,7 +346,8 @@ public class Main implements Plugin {
         });
 		
 		menuItemAutoStartTray.addFillListener(new MenuItemFillListener(){
-			
+
+			@Override
 			public void menuWillBeShown(MenuItem menu, Object data) {
 				if(hasAllTimers(pluginInterface.getDownloadManager().getDownloads())){
 		    		menu.setVisible(false);
@@ -321,6 +360,7 @@ public class Main implements Plugin {
 		
 		menuItemAutoStartTray.addListener(new MenuItemListener(){
 
+			@Override
 			public void selected(MenuItem menu, Object target) {
 				Download[] downloads = pluginInterface.getDownloadManager().getDownloads();
 				autoStartTorrents(downloads, "shu.plugin.systray");
